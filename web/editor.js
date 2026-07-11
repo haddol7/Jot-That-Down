@@ -170,11 +170,37 @@ function boot(doc, allowPage) {
       new (window.DragDrop && window.DragDrop.default || window.DragDrop)(
         editor, "3px solid #2383e2"
       );
+      // ⋮⋮가 어떤 상황(확대·좁은 폭·들여쓴 블록)에서도 글을 침범하지 않게
+      // 툴바가 움직일 때마다 본문 열 왼쪽으로 위치를 직접 고정한다
+      const toolbarEl = document.querySelector(".ce-toolbar");
+      if (toolbarEl) {
+        const pin = () => pinToolbarActions(toolbarEl);
+        new MutationObserver(pin).observe(toolbarEl, {
+          attributes: true, attributeFilter: ["style", "class"],
+        });
+        window.addEventListener("resize", pin);
+      }
       renderGutter();
       editorReady = true;
       setTimeout(pruneStrayImageBlocks, 300);  // 저장돼 있던 빈/깨진 이미지 블록 정리
     },
   });
+}
+
+// ⋮⋮ 액션 버튼을 본문 열 왼쪽 여백에 고정 — Editor.js의 모드별(모바일·narrow)
+// 배치가 본문 위로 올라오는 경우가 있어 실측 좌표로 직접 배치한다.
+// (style 속성의 !important는 어떤 스타일시트 규칙보다 우선한다)
+function pinToolbarActions(toolbarEl) {
+  const acts = toolbarEl.querySelector(".ce-toolbar__actions");
+  const content = document.querySelector(".ce-block__content");
+  if (!acts || !content) return;
+  const colLeft = content.getBoundingClientRect().left;
+  const tbLeft = toolbarEl.getBoundingClientRect().left;
+  const width = acts.offsetWidth || 26;
+  acts.style.setProperty(
+    "left", Math.round(colLeft - tbLeft - width - 8) + "px", "important"
+  );
+  acts.style.setProperty("right", "auto", "important");
 }
 
 // 페이지 전환 직전 등 — 디바운스 없이 즉시 저장
