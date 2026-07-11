@@ -13,7 +13,11 @@ from PyInstaller.utils.hooks import collect_data_files
 
 root = Path(SPECPATH).parent
 
-datas = [(str(root / "web"), "web"), (str(root / "assets" / "fonts"), "assets/fonts")]
+datas = [
+    (str(root / "web"), "web"),
+    (str(root / "assets" / "fonts"), "assets/fonts"),
+    (str(root / "assets" / "app.ico"), "assets"),
+]
 datas += collect_data_files("faster_whisper")
 
 # NVIDIA cuBLAS/cuDNN — datas로 nvidia/<pkg>/bin 구조 그대로 한 벌만 포함

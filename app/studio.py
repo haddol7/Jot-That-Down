@@ -212,6 +212,11 @@ def main() -> None:
     from PySide6.QtGui import QFont
 
     qt_app.setFont(QFont(load_fonts(), 10))  # 나눔스퀘어 전역 적용
+    from PySide6.QtGui import QIcon
+
+    from app.paths import resource_root
+
+    qt_app.setWindowIcon(QIcon(str(resource_root() / "assets" / "app.ico")))
     settings = load_settings(SETTINGS_DIR)
     qt_app.setStyleSheet(build_qss(settings.theme))
 
