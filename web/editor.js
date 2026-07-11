@@ -178,7 +178,14 @@ function boot(doc, allowPage) {
         new MutationObserver(pin).observe(toolbarEl, {
           attributes: true, attributeFilter: ["style", "class"],
         });
+        const actsEl = toolbarEl.querySelector(".ce-toolbar__actions");
+        if (actsEl) {  // 열림/닫힘 시에도 다시 맞춘다
+          new MutationObserver(pin).observe(actsEl, {
+            attributes: true, attributeFilter: ["class"],
+          });
+        }
         window.addEventListener("resize", pin);
+        document.getElementById("wrap").addEventListener("scroll", pin, true);
       }
       renderGutter();
       editorReady = true;
@@ -191,16 +198,22 @@ function boot(doc, allowPage) {
 // 배치가 본문 위로 올라오는 경우가 있어 실측 좌표로 직접 배치한다.
 // (style 속성의 !important는 어떤 스타일시트 규칙보다 우선한다)
 function pinToolbarActions(toolbarEl) {
-  const acts = toolbarEl.querySelector(".ce-toolbar__actions");
-  const content = document.querySelector(".ce-block__content");
-  if (!acts || !content) return;
-  const colLeft = content.getBoundingClientRect().left;
-  const tbLeft = toolbarEl.getBoundingClientRect().left;
-  const width = acts.offsetWidth || 26;
-  acts.style.setProperty(
-    "left", Math.round(colLeft - tbLeft - width - 8) + "px", "important"
-  );
-  acts.style.setProperty("right", "auto", "important");
+  // 레이아웃이 확정된 다음 프레임에 계산 — 숨김/전환 중의 0 좌표로
+  // 계산하면 엉뚱한 위치(본문 한가운데)에 박힌다
+  requestAnimationFrame(() => {
+    const acts = toolbarEl.querySelector(".ce-toolbar__actions");
+    const content = document.querySelector(".ce-block__content");
+    if (!acts || !content) return;
+    const tb = toolbarEl.getBoundingClientRect();
+    if (tb.width < 10 && tb.height < 10) return;  // 숨김 상태 — 기준 무효
+    const colLeft = content.getBoundingClientRect().left;
+    if (colLeft <= 0) return;
+    const width = acts.offsetWidth || 26;
+    const left = Math.round(colLeft - tb.left - width - 8);
+    if (!Number.isFinite(left)) return;
+    acts.style.setProperty("left", left + "px", "important");
+    acts.style.setProperty("right", "auto", "important");
+  });
 }
 
 // 페이지 전환 직전 등 — 디바운스 없이 즉시 저장
