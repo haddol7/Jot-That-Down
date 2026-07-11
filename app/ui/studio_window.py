@@ -508,7 +508,7 @@ class StudioWindow(QMainWindow):
         # 최소화 시 뜨는 실시간 자막 오버레이 (녹음 중일 때만)
         from .overlay import OverlayWindow
 
-        self._overlay = OverlayWindow()
+        self._overlay = OverlayWindow(settings)
         self._overlay.restore_requested.connect(self._restore_from_overlay)
         self._recording = False
         self._panel_hidden = False  # 자막 패널이 스플리터로 접힌 상태

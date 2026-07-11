@@ -78,6 +78,26 @@ class SettingsDialog(FramelessDialog):
         self._font.setValue(settings.editor_font_px)
         form.addRow("에디터 글꼴 크기", self._font)
 
+        # 실시간 자막(오버레이) — 최소화/패널 접힘 시 뜨는 자막 창
+        self._overlay_font = QSpinBox()
+        self._overlay_font.setRange(14, 32)
+        self._overlay_font.setSuffix(" px")
+        self._overlay_font.setValue(settings.overlay_font_px)
+        form.addRow("자막 글자 크기", self._overlay_font)
+
+        self._overlay_lines = QSpinBox()
+        self._overlay_lines.setRange(1, 4)
+        self._overlay_lines.setSuffix(" 줄")
+        self._overlay_lines.setValue(settings.overlay_lines)
+        form.addRow("자막 줄 수", self._overlay_lines)
+
+        self._overlay_ttl = QSpinBox()
+        self._overlay_ttl.setRange(3, 60)
+        self._overlay_ttl.setSuffix(" 초")
+        self._overlay_ttl.setValue(settings.overlay_ttl_sec)
+        self._overlay_ttl.setToolTip("자막이 이 시간 동안 새 말이 없으면 사라집니다")
+        form.addRow("자막 표시 시간", self._overlay_ttl)
+
         if self._corrections_path is not None:
             corrections_btn = QPushButton("교정 사전 편집…")
             corrections_btn.setToolTip("자주 틀리게 인식되는 표현을 바로잡는 규칙")
@@ -235,5 +255,8 @@ class SettingsDialog(FramelessDialog):
         self._settings.model_mode = self._model.currentData()
         self._settings.silence_sec = round(self._silence.value(), 1)
         self._settings.editor_font_px = self._font.value()
+        self._settings.overlay_font_px = self._overlay_font.value()
+        self._settings.overlay_lines = self._overlay_lines.value()
+        self._settings.overlay_ttl_sec = self._overlay_ttl.value()
         self._on_apply()
         self.accept()

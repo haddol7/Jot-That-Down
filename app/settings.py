@@ -11,6 +11,9 @@ class AppSettings:
     silence_sec: float = 0.7      # 이만큼 조용하면 발화 확정
     editor_font_px: int = 16      # 에디터 본문 글꼴 크기
     panel_side: str = "right"     # 받아쓰기 패널 위치: left | right | top | bottom
+    overlay_font_px: int = 20     # 실시간 자막(오버레이) 글자 크기
+    overlay_lines: int = 2        # 오버레이에 유지할 자막 줄 수
+    overlay_ttl_sec: int = 10     # 자막이 사라지기까지의 시간
     data_dir: str = ""            # 데이터 폴더 (비면 기본 위치) — 클라우드 동기화용
     # PDF 도구별 스타일: {"underline": {"color": "#...", "width": 2.4}, ...}
     pdf_tool_styles: dict = field(default_factory=dict)

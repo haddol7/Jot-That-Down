@@ -26,11 +26,9 @@ _DOT = {AudioSource.MIC: "#5aa9ff", AudioSource.SYSTEM: "#9be36b"}  # 출처 색
 class OverlayWindow(QWidget):
     restore_requested = Signal()
 
-    MAX_LINES = 2
-    LINE_TTL_SEC = 10.0
-
-    def __init__(self) -> None:
+    def __init__(self, settings=None) -> None:
         super().__init__()
+        self._settings = settings
         self.setWindowFlags(
             Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
@@ -66,7 +64,6 @@ class OverlayWindow(QWidget):
         restore.clicked.connect(self.restore_requested)
         top.addWidget(restore)
         card_layout.addLayout(top)
-        card_layout.addStretch()  # 자막은 카드 아래쪽에 붙인다
 
         self._lines_box = QVBoxLayout()
         self._lines_box.setContentsMargins(0, 0, 0, 0)
@@ -80,22 +77,34 @@ class OverlayWindow(QWidget):
         self._lines: list[tuple[float, QLabel, tuple]] = []  # (시각, 라벨, 발화 키)
         self._drag_offset: QPoint | None = None
 
-        # 크기·위치 고정 — 자막 길이에 따라 창이 출렁이지 않는다
+        # 폭·아래 변 고정, 높이는 내용만큼 (위로만 자란다 — 위 여백 없음)
         screen = QGuiApplication.primaryScreen().availableGeometry()
         self._width = min(760, int(screen.width() * 0.55))
-        self.setFixedSize(self._width, 170)
-        self.move(
-            screen.center().x() - self._width // 2,
-            screen.bottom() - 70 - self.height(),
-        )
+        self.setFixedWidth(self._width)
+        self._anchor_bottom = screen.bottom() - 70
+        self.move(screen.center().x() - self._width // 2, self._anchor_bottom)
+        self._refit()
 
         self._expire_timer = QTimer(self)
         self._expire_timer.timeout.connect(self._expire_old_lines)
         self._expire_timer.start(1000)
 
+    # --- 설정 (없으면 기본값) ---
+
+    @property
+    def _font_px(self) -> int:
+        return getattr(self._settings, "overlay_font_px", 20) if self._settings else 20
+
+    @property
+    def _max_lines(self) -> int:
+        return getattr(self._settings, "overlay_lines", 2) if self._settings else 2
+
+    @property
+    def _ttl_sec(self) -> float:
+        return getattr(self._settings, "overlay_ttl_sec", 10) if self._settings else 10
+
     # --- 슬롯 (브리지 시그널과 연결) ---
 
-    _FONT_PX = 20
     _CAPTION_QSS = (
         "color: #ffffff; line-height: 1.35;"
         "border-left: 3px solid {dot}; padding-left: 10px;"
@@ -103,8 +112,22 @@ class OverlayWindow(QWidget):
 
     def _caption_font(self) -> QFont:
         font = QFont("NanumSquare Neo")
-        font.setPixelSize(self._FONT_PX)
+        font.setPixelSize(self._font_px)
         return font
+
+    def _refit(self) -> None:
+        """내용에 맞춰 높이 조절 — 아래 변은 고정, 위로만 늘고 준다."""
+        # 레이아웃 sizeHint는 워드랩 줄바꿈을 반영하지 못하므로
+        # 자막 라벨들의 실제 높이(heightForWidth)를 직접 합산한다
+        inner_w = self._width - 18 - 12  # 카드 좌우 여백
+        lines_h = 0
+        for _, label, _ in self._lines:
+            h = label.heightForWidth(inner_w)
+            lines_h += min(h, label.maximumHeight())
+        lines_h += max(0, len(self._lines) - 1) * 3  # 줄 간격
+        height = 12 + 22 + 4 + lines_h + 14  # 상하 여백 + 상단바 + 간격
+        self.setFixedHeight(max(height, 52))
+        self.move(self.x(), self._anchor_bottom - self.height())
 
     def _make_caption(self, text: str, dot_color: str) -> QLabel:
         label = QLabel(text)
@@ -148,6 +171,7 @@ class OverlayWindow(QWidget):
             stamp, label, _ = self._lines[-1]
             label.setText(text)
             self._lines[-1] = (time.monotonic(), label, key)
+            self._refit()
             return
         label = self._make_caption(text, _DOT[segment.source])
         label.setMaximumHeight(max_h)  # 겹침 방지 안전장치
@@ -159,8 +183,9 @@ class OverlayWindow(QWidget):
             )
         self._lines_box.addWidget(label)
         self._lines.append((time.monotonic(), label, key))
-        while len(self._lines) > self.MAX_LINES:
+        while len(self._lines) > self._max_lines:
             self._remove_oldest()
+        self._refit()
 
     def set_click_through(self, enabled: bool) -> None:
         self.setWindowFlag(Qt.WindowTransparentForInput, enabled)
@@ -175,8 +200,12 @@ class OverlayWindow(QWidget):
 
     def _expire_old_lines(self) -> None:
         now = time.monotonic()
-        while self._lines and now - self._lines[0][0] > self.LINE_TTL_SEC:
+        removed = False
+        while self._lines and now - self._lines[0][0] > self._ttl_sec:
             self._remove_oldest()
+            removed = True
+        if removed:
+            self._refit()
 
     # --- 드래그 이동 ---
 
@@ -187,6 +216,7 @@ class OverlayWindow(QWidget):
     def mouseMoveEvent(self, event) -> None:
         if self._drag_offset is not None and event.buttons() & Qt.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_offset)
+            self._anchor_bottom = self.y() + self.height()  # 새 위치에 다시 고정
 
     def mouseReleaseEvent(self, event) -> None:
         self._drag_offset = None
