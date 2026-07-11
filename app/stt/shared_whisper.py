@@ -5,6 +5,7 @@
 """
 import queue
 import threading
+import time
 from typing import Callable
 
 import numpy as np
@@ -62,12 +63,16 @@ class SharedWhisper:
     # --- 내부 ---
 
     def _run(self) -> None:
+        from .. import diag
+
         cfg = self._config
         while True:
             item = self._queue.get()
             if item is None:
                 break
             audio, on_text = item
+            backlog = self._queue.qsize()
+            started = time.monotonic()
             try:
                 segments, _ = self._model.transcribe(
                     audio,
@@ -75,7 +80,15 @@ class SharedWhisper:
                     initial_prompt=cfg.initial_prompt,
                 )
                 text = " ".join(s.text.strip() for s in segments).strip()
-            except Exception:
-                continue  # 한 발화의 실패가 파이프라인을 죽이지 않게
+            except Exception as error:  # 한 발화의 실패가 파이프라인을 죽이지 않게
+                diag.log("whisper", f"인식 실패! {type(error).__name__}: {error}")
+                continue
+            took = time.monotonic() - started
             if text:
+                diag.log(
+                    "whisper",
+                    f"{took:.1f}s, 대기 {backlog}건, 결과 {len(text)}자: {text[:40]}",
+                )
                 on_text(text)
+            else:
+                diag.log("whisper", f"{took:.1f}s, 결과 비어 있음 (무음/잡음 판정)")

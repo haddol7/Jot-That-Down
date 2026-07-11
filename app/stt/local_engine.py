@@ -5,6 +5,7 @@
 """
 import queue
 import threading
+import time
 
 import numpy as np
 
@@ -91,18 +92,45 @@ class _LocalEngineBase(TranscriptionEngine):
         self._chunks.put((samples, sample_rate))
 
     def _pump(self) -> None:
+        from .. import diag
+
+        last_beat = time.monotonic()
+        chunk_count = 0
         while self._running.is_set():
-            item = self._chunks.get()
+            try:
+                item = self._chunks.get(timeout=3.0)
+            except queue.Empty:
+                # 캡처가 끊겼다 — 장치 변경(헤드폰 연결 등)이 흔한 원인
+                if self._active.is_set():
+                    diag.log("capture", f"{self.SOURCE.value}: 3초간 오디오 없음 (장치 끊김?)")
+                continue
             if item is None:
                 break
             samples, rate = item
+            chunk_count += 1
+            now = time.monotonic()
+            if now - last_beat >= 10.0:  # 10초마다 하트비트
+                diag.log(
+                    "capture",
+                    f"{self.SOURCE.value}: {chunk_count}청크/10s, "
+                    f"최근소리 {self._clock.now_ms() - self._last_sound_ms}ms 전",
+                )
+                last_beat = now
+                chunk_count = 0
             self._segmenter.feed(_to_16k_float(samples, rate))
 
     def _on_utterance(
         self, audio: np.ndarray, duration_ms: int, tail_ms: int, partial: bool
     ) -> None:
+        from .. import diag
+
         t_end = self._clock.now_ms() - tail_ms
         t_start = max(0, t_end - (duration_ms - tail_ms))
+        diag.log(
+            "utterance",
+            f"{self.SOURCE.value}: {duration_ms}ms 발화 확정 → 인식 큐"
+            f"{' (강제컷)' if partial else ''}",
+        )
         self._shared.submit(
             audio, lambda text: self._dispatch(text, t_start, t_end, partial)
         )

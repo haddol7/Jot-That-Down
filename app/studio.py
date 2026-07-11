@@ -84,6 +84,10 @@ class LiveRuntime:
         # 세션 중 두 번째 소스가 켜질 수 있으므로 항상 2개 기준으로 모델 선택
         self._config, reason = bootstrap.resolve_config("both", settings)
         print(f"모델 선택: {reason}")
+        from app import diag
+
+        diag.reset()  # 세션마다 STT 진단 로그 새로 시작
+        diag.log("session", f"세션 {self.session_id} · {reason}")
 
         self._sink = TransformingSink(
             bootstrap.build_transforms(), [ConsoleSink(), bridge]

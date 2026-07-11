@@ -28,11 +28,15 @@ _FILLERS = {
 
 class HallucinationFilter:
     def apply(self, segment: TranscriptSegment) -> TranscriptSegment | None:
+        from .. import diag
+
         text = segment.text.strip()
         normalized = text.rstrip(".!?~ ").strip()
         if normalized in _KNOWN_HALLUCINATIONS:
+            diag.log("filter", f"환각 드랍: {text[:40]}")
             return None
         if self._is_only_fillers(normalized):
+            diag.log("filter", f"감탄사 드랍: {text[:40]}")
             return None
         return segment
 
