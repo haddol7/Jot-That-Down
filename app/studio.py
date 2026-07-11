@@ -213,6 +213,15 @@ def main() -> None:
 
     ensure_std_streams()  # windowed exe: sys.stdout이 None이라 먼저 보정
 
+    # 작업 표시줄이 pythonw의 파이썬 아이콘 대신 앱 아이콘을 쓰도록
+    # 프로세스에 고유 AppUserModelID를 부여한다 (창 아이콘이 그대로 쓰인다)
+    import ctypes
+
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("JotThatDown")
+    except (AttributeError, OSError):
+        pass
+
     qt_app = QApplication(sys.argv)
     from app.ui.fonts import load_fonts
     from PySide6.QtGui import QFont
