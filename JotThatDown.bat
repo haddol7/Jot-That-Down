@@ -1,3 +1,3 @@
 @echo off
 cd /d "%~dp0"
-start "" ".venv\Scripts\pythonw.exe" run_app.py
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\update_and_launch.ps1"
