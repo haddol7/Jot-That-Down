@@ -28,6 +28,23 @@ ENGINE_CLASSES = {
 SOURCES = tuple(ENGINE_CLASSES)
 
 
+# 모델별 대략적 다운로드 용량 (안내 표시용)
+_MODEL_SIZES = {"large-v3": "약 3GB", "large-v3-turbo": "약 1.6GB", "small": "약 0.5GB"}
+
+
+def model_download_notice(model: str) -> str | None:
+    """모델이 캐시에 없으면 '내려받는 중' 안내문(용량 포함), 있으면 None."""
+    import os
+    from pathlib import Path
+
+    cache = Path(os.path.expanduser("~")) / ".cache" / "huggingface" / "hub"
+    for entry in cache.glob(f"models--*faster-whisper-{model}*"):
+        if any((entry / "snapshots").glob("*/*")):
+            return None  # 이미 받아둠
+    size = _MODEL_SIZES.get(model, "수 GB")
+    return f"음성 인식 모델 내려받는 중… ({model} · {size} · 최초 1회)"
+
+
 def cuda_available() -> bool:
     import ctranslate2
 

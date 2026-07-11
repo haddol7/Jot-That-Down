@@ -177,8 +177,10 @@ class LiveRuntime:
                 return
             engine = self._engines.get(source)
             if engine is None:
+                notice = bootstrap.model_download_notice(self._config.model)
                 self._bridge.status_changed.emit(
-                    f"{_ICONS[source]} 모델 로딩 중… ({self._config.model})"
+                    notice
+                    or f"{_ICONS[source]} 모델 로딩 중… ({self._config.model})"
                 )
                 engine = _ENGINE_FOR[source](self._config, self.clock, self._shared)
                 engine.add_sink(self._sink)

@@ -168,9 +168,14 @@ class SettingsDialog(FramelessDialog):
         if root is None:
             answer = QMessageBox.question(
                 self, "구글 드라이브 설치",
-                "구글 드라이브 앱이 아직 없습니다. 바로 설치할까요?\n"
-                "설치 후 구글 계정으로 로그인하고 이 버튼을 다시 누르면\n"
-                "연결이 끝납니다.",
+                "구글 드라이브 앱이 아직 없습니다. 바로 설치할까요?\n\n"
+                "진행 순서:\n"
+                "  1. [예]를 누르면 공식 설치 파일을 받아 실행합니다\n"
+                "  2. Windows 권한 창(파란 방패)이 뜨면 [예]로 허용\n"
+                "  3. 설치가 끝나면 브라우저에서 구글 계정으로 로그인\n"
+                "  4. 파일 탐색기에 'G:\\내 드라이브'가 생겼는지 확인\n"
+                "  5. 이 버튼을 다시 누르면 연결이 끝납니다\n\n"
+                "노트·녹음이 드라이브에 자동 백업되고 다른 PC와 공유됩니다.",
             )
             if answer == QMessageBox.Yes:
                 self._install_gdrive()
@@ -208,8 +213,13 @@ class SettingsDialog(FramelessDialog):
         os.startfile(str(target))
         QMessageBox.information(
             self, "설치 진행",
-            "설치가 시작됐습니다. 설치를 마치고 구글 계정으로 로그인한 뒤,\n"
-            "'구글 드라이브에 연결…' 버튼을 다시 눌러주세요.",
+            "설치 파일을 실행했습니다. 이어서:\n\n"
+            "  1. Windows 권한 창이 뜨면 [예]로 허용\n"
+            "  2. 설치 완료 후 구글 계정으로 로그인 (브라우저가 열립니다)\n"
+            "  3. 작업 표시줄 트레이의 드라이브 아이콘이 동기화 완료가 되면\n"
+            "  4. '구글 드라이브에 연결…' 버튼을 다시 눌러주세요\n\n"
+            "이미 다른 PC에서 쓰고 있다면 '기존 데이터 발견' 창에서\n"
+            "[예 (그대로 사용)]을 선택하면 됩니다.",
         )
 
     def _apply_data_dir(self, new_dir) -> None:

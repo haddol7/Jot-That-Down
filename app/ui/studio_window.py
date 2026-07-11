@@ -739,8 +739,8 @@ class StudioWindow(QMainWindow):
             self._debug.setText(text)
 
     def show_status(self, text: str) -> None:
-        """대기 상태(모델 로딩 등)는 자막 타임라인 배너로만 보여준다."""
-        if "로딩" in text:
+        """대기 상태(모델 로딩·다운로드)는 자막 타임라인 배너로만 보여준다."""
+        if "로딩" in text or "내려받는" in text:
             self.session_page.panel.show_pending(text)
         else:
             self.session_page.panel.clear_pending()
