@@ -1,0 +1,444 @@
+@font-face {
+  font-family: "NanumSquare Neo";
+  src: url("fonts/NanumSquareNeo.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "NanumSquare Neo";
+  src: url("fonts/NanumSquareNeoB.ttf") format("truetype");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "NanumSquare Neo";
+  src: url("fonts/NanumSquareNeoEB.ttf") format("truetype");
+  font-weight: 800;
+}
+@font-face {
+  font-family: "NanumSquare";
+  src: url("fonts/NanumSquareR.ttf") format("truetype");
+  font-weight: 400;
+}
+@font-face {
+  font-family: "NanumSquare";
+  src: url("fonts/NanumSquareB.ttf") format("truetype");
+  font-weight: 700;
+}
+@font-face {
+  font-family: "NanumSquare";
+  src: url("fonts/NanumSquareEB.ttf") format("truetype");
+  font-weight: 800;
+}
+
+/* 테마 토큰 — app/ui/theme.py의 TOKENS와 같은 값 (한쪽 수정 시 양쪽 동기화) */
+body {
+  --bg: #ffffff;
+  --text: #37352f;
+  --muted: #787774;
+  --faint: #9b9a97;
+  --border: #e9e9e7;
+  --hover: #f1f1ef;
+  --selection: rgba(35, 131, 226, 0.15);
+  --accent: #2383e2;
+  --code-bg: rgba(135, 131, 120, 0.15);
+  --code-text: #eb5757;
+  --font-size: 16px;
+}
+body[data-theme="dark"] {
+  --bg: #191919;
+  --text: #e8e8e6;
+  --muted: #9b9b98;
+  --faint: #6f6f6c;
+  --border: #2e2e2c;
+  --hover: #252525;
+  --selection: rgba(35, 131, 226, 0.30);
+  --code-bg: rgba(135, 131, 120, 0.25);
+  --code-text: #ff7369;
+}
+
+body {
+  font-family: "NanumSquare Neo", "NanumSquare", "Malgun Gothic", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  overflow-x: hidden; /* 가로 스크롤바는 아예 만들지 않는다 */
+}
+
+/* 스크롤바 테마화 — 트랙(배경) 없이 손잡이만 */
+::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--faint); background-clip: content-box; }
+
+/* Editor.js 코어가 밝은 선택색(#e1f2ff)을 강제하므로 !important로 테마 색을 관철 —
+   다크 모드에서 드래그 영역이 하얗게 떠서 글자가 안 보이던 문제의 원인 */
+::selection {
+  background: var(--selection) !important;
+  color: currentColor !important;
+}
+
+#wrap {
+  position: relative;
+  max-width: 860px;
+  margin: 24px auto;
+  /* 왼쪽 여백: [타임스탬프 56px] [블록 도구 +·⋮⋮] [본문] 순서의 차선 */
+  padding: 0 24px 40vh 148px;
+}
+
+#gutter { position: absolute; left: 0; top: 0; width: 140px; height: 100%; }
+
+.stamp {
+  position: absolute;
+  left: 0;
+  width: 56px;
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.2;
+  padding-top: 9px;
+  color: var(--faint);
+  cursor: pointer;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.stamp:hover { color: var(--accent); }
+
+/* 노트↔자막 점프 시 잠깐 강조 */
+.flash { animation: flash-bg 1.4s ease-out; }
+@keyframes flash-bg { from { background: var(--selection); } to { background: transparent; } }
+
+/* --- 본문 타이포그래피 (노션 느낌) --- */
+.ce-block__content { font-size: var(--font-size); line-height: 1.7; }
+.ce-paragraph { padding: 4px 0; }
+h1.ce-header { font-size: 1.8em; font-weight: 800; padding: 18px 0 6px; }
+h2.ce-header { font-size: 1.45em; font-weight: 700; padding: 14px 0 4px; }
+h3.ce-header { font-size: 1.2em; font-weight: 700; padding: 10px 0 3px; }
+
+.codex-editor--empty .ce-paragraph::before,
+.ce-paragraph[data-placeholder]:empty::before { color: var(--faint); }
+
+/* 인용구 — 코드 블록처럼 내용만큼만 차지 (여백 최소화, 빈 캡션은 숨김) */
+.cdx-quote {
+  border-left: 3px solid var(--text);
+  padding: 0 0 0 12px !important;
+  margin: 2px 0;
+}
+.cdx-quote__text {
+  font-size: 1em;
+  min-height: 0 !important;
+  margin-bottom: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 2px 0 !important;
+}
+.cdx-quote__caption {
+  color: var(--faint);
+  font-size: 0.85em;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 0 2px !important;
+  min-height: 0 !important;
+}
+/* 캡션이 비어 있고 편집 중이 아니면 자리도 차지하지 않는다 */
+.cdx-quote:not(:focus-within) .cdx-quote__caption:empty { display: none; }
+
+.inline-code,
+code.inline-code {
+  background: var(--code-bg) !important;
+  color: var(--code-text) !important;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.88em;
+  font-family: "Cascadia Mono", Consolas, monospace;
+}
+
+.cdx-checklist__item-checkbox-check { border-color: var(--faint); }
+
+/* 형광펜 (Ctrl+Shift+H) */
+mark.cdx-marker {
+  background: var(--marker-bg, rgba(255, 212, 0, 0.42));
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+body[data-theme="dark"] { --marker-bg: rgba(255, 212, 0, 0.30); }
+
+/* 코드 블록 — highlight.js 색칠(pre) 위에 투명 textarea를 얹어 편집 */
+.hljs-code { position: relative; margin: 4px 0; }
+.hljs-code pre,
+.hljs-code__input {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 0.85em;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.hljs-code pre {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--hover);          /* 배경·색칠 글자는 뒤의 pre가 담당 */
+}
+.hljs-code pre code.hljs {
+  display: block;
+  background: transparent;
+  padding: 0;
+  color: var(--text);
+}
+.hljs-code__input {
+  position: relative;
+  width: 100%;
+  background: transparent;           /* 투명 — 뒤의 색칠된 글자가 비쳐 보이게 */
+  border-color: transparent;
+  color: transparent;                /* 글자는 pre가 보여주고, 여기선 캐럿만 */
+  caret-color: var(--text);
+  resize: none;
+  min-height: 0;
+}
+.hljs-code__input::placeholder { color: var(--faint); }
+
+/* highlight.js 토큰 색 (라이트) */
+.hljs-keyword, .hljs-built_in { color: #a626a4; }
+.hljs-type { color: #c18401; }
+.hljs-string, .hljs-char { color: #50a14f; }
+.hljs-number, .hljs-literal { color: #986801; }
+.hljs-comment { color: #a0a1a7; font-style: italic; }
+.hljs-title, .hljs-title.function_ { color: #4078f2; }
+.hljs-meta, .hljs-meta .hljs-string { color: #4078f2; }
+.hljs-attr, .hljs-variable { color: #e45649; }
+/* 다크 테마 토큰 색 */
+body[data-theme="dark"] .hljs-keyword,
+body[data-theme="dark"] .hljs-built_in { color: #c678dd; }
+body[data-theme="dark"] .hljs-type { color: #e5c07b; }
+body[data-theme="dark"] .hljs-string,
+body[data-theme="dark"] .hljs-char { color: #98c379; }
+body[data-theme="dark"] .hljs-number,
+body[data-theme="dark"] .hljs-literal { color: #d19a66; }
+body[data-theme="dark"] .hljs-comment { color: #7f848e; }
+body[data-theme="dark"] .hljs-title,
+body[data-theme="dark"] .hljs-title.function_ { color: #61afef; }
+body[data-theme="dark"] .hljs-meta { color: #61afef; }
+body[data-theme="dark"] .hljs-attr,
+body[data-theme="dark"] .hljs-variable { color: #e06c75; }
+
+/* 토글 블록 (> + 스페이스) */
+.toggle-block__icon svg { fill: var(--muted); }
+.toggle-block__input { color: var(--text); }
+.toggle-block__input:empty:before { color: var(--faint); }
+/* 토글 안으로 들어갈 때 뜨는 자식 문단 placeholder 제거 */
+.toggle-block__item[data-placeholder]:empty::before,
+.toggle-block__item [data-placeholder]:empty::before,
+.toggle-block__item .ce-paragraph[data-placeholder]:empty::before {
+  content: "" !important;
+}
+
+/* 페이지 블록 — 클릭하면 그 페이지 안으로 */
+.page-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+.page-link:hover { background: var(--hover); }
+.page-link__title {
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+}
+
+/* 이미지 블록 (붙여넣기 전용) — 크기 조절 핸들 + 정렬 */
+.note-image { display: flex; margin: 6px 0; outline: none; }
+.note-image.align-left { justify-content: flex-start; }
+.note-image.align-center { justify-content: center; }
+.note-image.align-right { justify-content: flex-end; }
+.note-image__frame {
+  position: relative;
+  display: inline-block;
+  width: auto;       /* 기본 = 원본 크기, 크면 max-width가 막는다 */
+  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.note-image__img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.note-image__handle {
+  position: absolute;
+  right: 4px; bottom: 4px;
+  width: 14px; height: 14px;
+  border: 2px solid #ffffff;
+  border-radius: 3px;
+  background: var(--accent);
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.12s;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+}
+.note-image__frame:hover .note-image__handle { opacity: 1; }
+
+/* 글머리 깊이별 마커: • → ◦ → ▪ (Tab으로 들여쓰기) — 기본이 너무 작아 키움 */
+.cdx-list-unordered .cdx-list__item:before {
+  color: var(--muted);
+  font-size: 1.35em;
+  line-height: 1.1;
+  font-family: "NanumSquare Neo", "Malgun Gothic", "Segoe UI Symbol", sans-serif;
+}
+.cdx-list-unordered .cdx-list-unordered .cdx-list__item:before { content: "◦"; }
+.cdx-list-unordered .cdx-list-unordered .cdx-list-unordered .cdx-list__item:before {
+  content: "▪";
+  font-size: 1.05em;
+  line-height: 1.4;
+}
+
+/* 중첩 들여쓰기 간격 축소 — 자식 줄을 전체 폭으로 펼치고 명시적 여백만 준다 */
+.cdx-list__item {
+  grid-template-areas: "checkbox content" "child child" !important;
+}
+/* 자식 컨테이너 = 중첩 리스트 자신 (기본 padding-left 40px이 과한 들여쓰기의 원인) */
+.cdx-list__item-children {
+  margin-left: 20px !important;
+  padding: 3px 0 0 0 !important;
+  gap: 3px !important;
+}
+.cdx-list__item-content { padding-left: 6px !important; }
+
+/* 블록 단위(여러 블록 걸친) 선택 — 각 블록 하이라이트 사이에 여백 */
+/* 선택 하이라이트 — margin/padding을 더하면 선택 순간 글이 밀리므로,
+   배경 이미지를 위아래 2px씩 좁게 그려서 인접 하이라이트 사이 여백만 낸다 */
+.ce-block--selected .ce-block__content {
+  background-color: transparent !important;
+  background-image: linear-gradient(var(--selection), var(--selection)) !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% calc(100% - 4px) !important;
+  background-position: 0 2px !important;
+  border-radius: 6px;
+}
+
+.codex-editor__redactor { padding-bottom: 0 !important; }
+
+/* 인용 기본 min-height(158px) 때문에 빈 줄을 지워도 커다랗게 남는다 */
+.cdx-quote__text { min-height: 0 !important; }
+
+/* --- Editor.js 자체 UI(팝오버·툴바)의 테마 대응 --- */
+/* 블록에 마우스를 올리면 +/⋮⋮가 부드럽게 페이드인 */
+.ce-toolbar__actions {
+  transition: opacity 0.18s ease !important;
+}
+.ce-toolbar__plus, .ce-toolbar__settings-btn { color: var(--muted); }
+.ce-toolbar__plus:hover, .ce-toolbar__settings-btn:hover { background: var(--hover); color: var(--text); }
+
+/* 블록 도구(+, ⋮⋮)는 항상 본문 왼쪽에 — 에디터 폭이 650px보다 좁아지면
+   Editor.js가 오른쪽으로 옮기는 narrow 모드 기본값을 무효화한다 */
+.codex-editor--narrow .ce-toolbar__actions {
+  /* Editor.js가 스타일을 런타임에 주입해 뒤에 오므로 !important 필요 */
+  right: 100% !important;
+  left: auto !important;
+  background: transparent !important;
+}
+.codex-editor--narrow .ce-block--focused {
+  margin-right: 0;
+  padding-right: 0;
+}
+
+/* 블록 드래그 중 드롭 대상 — 파란 선(플러그인이 border로 그림)에 더해
+   블록 전체를 살짝 밝혀 어디로 들어가는지 분명하게 */
+.ce-block--drop-target {
+  background: rgba(35, 131, 226, 0.07);
+  border-radius: 4px;
+}
+.ce-block--drop-target .ce-block__content {
+  transition: transform 0.1s ease;
+}
+
+/* 확대(줌)로 뷰포트가 650px보다 좁아지면 Editor.js가 모바일용 큰 흰색
+   버튼(36px, 그림자)으로 바꾼다 — 데스크톱 모양을 그대로 유지한다 */
+@media (max-width: 650px) {
+  .ce-toolbar__plus, .ce-toolbar__settings-btn {
+    width: 26px !important;
+    height: 26px !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--muted) !important;
+  }
+  .ce-toolbar__plus:hover, .ce-toolbar__settings-btn:hover {
+    background: var(--hover) !important;
+    color: var(--text) !important;
+  }
+  .ce-toolbar__actions { right: 100% !important; left: auto !important; }
+  .ce-inline-tool { width: auto !important; height: auto !important; }
+  .ce-inline-tool svg { width: 20px !important; height: 20px !important; }
+  .cdx-settings-button { width: 26px !important; height: 26px !important; }
+  .cdx-settings-button svg { width: 20px !important; height: 20px !important; }
+}
+
+.ce-popover__container {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.ce-popover-item { color: var(--text); }
+.ce-popover-item__title { color: var(--text); }
+.ce-popover-item__icon { background: var(--bg); border: 1px solid var(--border); color: var(--text); box-shadow: none; }
+.ce-popover-item:hover:not(.ce-popover-item--no-hover) { background: var(--hover); }
+/* 블록 메뉴 필터 — "/" 뒤에 글자를 치면 여기로 들어가 항목이 걸러진다.
+   박스 티가 안 나게 컴팩트한 테마 스타일로만 남긴다 */
+.cdx-search-field {
+  background: var(--hover);
+  border: none;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+.cdx-search-field__input { color: var(--text); font-size: 13px; }
+.cdx-search-field__input::placeholder { color: var(--faint); }
+.cdx-search-field__icon svg { color: var(--faint); }
+
+/* 커스텀 슬래시 메뉴 — 블록에 "/…"를 치면 그 값으로 필터되어 위에 뜬다 */
+.slash-menu {
+  position: fixed;
+  z-index: 9999;
+  display: none;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+}
+.slash-item {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.slash-item.active, .slash-item:hover { background: var(--hover); }
+
+.ce-inline-toolbar {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.ce-inline-tool { color: var(--text); }
+.ce-inline-tool:hover { background: var(--hover); }
+.ce-inline-toolbar__dropdown:hover { background: var(--hover); }
+
+.ce-conversion-toolbar {
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.ce-conversion-tool:hover { background: var(--hover); }
+.ce-conversion-tool__icon { background: var(--bg); border: 1px solid var(--border); }

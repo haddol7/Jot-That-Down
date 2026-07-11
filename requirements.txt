@@ -1,0 +1,20 @@
+# STT: 자체 파이프라인 (캡처 → Silero VAD(ONNX) → 공유 faster-whisper 모델)
+# torch 불필요 — VAD는 faster-whisper 내장 ONNX 모델을 onnxruntime으로 구동
+faster-whisper
+onnxruntime
+
+# WASAPI 루프백 캡처 (M3에서 사용)
+PyAudioWPatch
+
+# ctranslate2(faster-whisper) GPU 실행에 필요한 CUDA DLL — 시스템 CUDA 설치 불필요
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+
+# VRAM 조회 (디버그 표시·모델 자동 선택) — nvidia-smi 스폰 대신 인프로세스 NVML
+nvidia-ml-py
+
+# 오디오 파일 입출력 (셀프테스트, M5 녹음)
+soundfile
+
+# UI (M2+): 오버레이 자막 창, 메인 창
+PySide6

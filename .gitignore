@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+scratch/
+*.wav
+data/
+build/
+dist/
+fonts_backup/
+*.log
