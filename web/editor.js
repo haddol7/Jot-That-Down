@@ -398,6 +398,9 @@ class HljsCodeTool {
     this.ta.className = "hljs-code__input";
     this.ta.value = this.code;
     this.ta.spellcheck = false;
+    // soft-wrap이 켜져 있으면 뒤의 pre(줄바꿈 없음)와 줄이 어긋나
+    // 확대 시 커서 위치가 안 맞는다
+    this.ta.setAttribute("wrap", "off");
     this.ta.setAttribute("placeholder", "C/C++ 코드");
 
     this.ta.addEventListener("input", () => {

@@ -173,9 +173,13 @@ body[data-theme="dark"] { --marker-bg: rgba(255, 212, 0, 0.30); }
   margin: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 0.85em;
-  line-height: 1.5;
+  /* pre와 textarea의 글자 폭이 1px도 어긋나면 커서가 밀린다 —
+     런타임 주입 CSS가 폰트를 덮지 못하게 !important */
+  font-family: "Cascadia Mono", Consolas, monospace !important;
+  font-size: 0.85em !important;
+  line-height: 1.5 !important;
+  letter-spacing: normal !important;
+  font-variant-ligatures: none !important;
   white-space: pre;
   tab-size: 2;
   box-sizing: border-box;
@@ -193,6 +197,9 @@ body[data-theme="dark"] { --marker-bg: rgba(255, 212, 0, 0.30); }
   background: transparent;
   padding: 0;
   color: var(--text);
+  /* 브라우저 기본 code{font-family:monospace}(=Courier New)가 상속을 이겨
+     textarea와 글자 폭이 어긋난다 — pre의 폰트를 그대로 물려받게 강제 */
+  font: inherit !important;
 }
 .hljs-code__input {
   position: relative;
@@ -330,14 +337,16 @@ body[data-theme="dark"] .hljs-variable { color: #e06c75; }
 .cdx-quote__text { min-height: 0 !important; }
 
 /* --- Editor.js 자체 UI(팝오버·툴바)의 테마 대응 --- */
-/* 블록에 마우스를 올리면 +/⋮⋮가 부드럽게 페이드인 */
+/* + 버튼은 쓰지 않는다 — 블록 생성은 타이핑·마크다운 단축으로 충분 */
+.ce-toolbar__plus { display: none !important; }
+/* 블록에 마우스를 올리면 ⋮⋮가 부드럽게 페이드인 */
 .ce-toolbar__actions {
   transition: opacity 0.18s ease !important;
 }
 .ce-toolbar__plus, .ce-toolbar__settings-btn { color: var(--muted); }
 .ce-toolbar__plus:hover, .ce-toolbar__settings-btn:hover { background: var(--hover); color: var(--text); }
 
-/* 블록 도구(+, ⋮⋮)는 항상 본문 왼쪽에 — 에디터 폭이 650px보다 좁아지면
+/* 블록 도구(⋮⋮)는 항상 본문 왼쪽에 — 에디터 폭이 650px보다 좁아지면
    Editor.js가 오른쪽으로 옮기는 narrow 모드 기본값을 무효화한다 */
 .codex-editor--narrow .ce-toolbar__actions {
   /* Editor.js가 스타일을 런타임에 주입해 뒤에 오므로 !important 필요 */
@@ -348,6 +357,13 @@ body[data-theme="dark"] .hljs-variable { color: #e06c75; }
 .codex-editor--narrow .ce-block--focused {
   margin-right: 0;
   padding-right: 0;
+}
+/* 좁은 폭(확대 포함)에서는 본문이 전체 폭을 차지해 ⋮⋮ 놓을 자리가 없다 —
+   왼쪽 여백을 확보해 버튼이 글을 침범하지 않게 한다 */
+.codex-editor--narrow .ce-block__content {
+  margin-left: 34px !important;
+  margin-right: 10px !important;
+  max-width: none !important;
 }
 
 /* 블록 드래그 중 드롭 대상 — 파란 선(플러그인이 border로 그림)에 더해
@@ -376,6 +392,11 @@ body[data-theme="dark"] .hljs-variable { color: #e06c75; }
     color: var(--text) !important;
   }
   .ce-toolbar__actions { right: 100% !important; left: auto !important; }
+  .ce-block__content {
+    margin-left: 34px !important;
+    margin-right: 10px !important;
+    max-width: none !important;
+  }
   .ce-inline-tool { width: auto !important; height: auto !important; }
   .ce-inline-tool svg { width: 20px !important; height: 20px !important; }
   .cdx-settings-button { width: 26px !important; height: 26px !important; }
