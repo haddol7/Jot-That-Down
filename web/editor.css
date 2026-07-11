@@ -391,7 +391,12 @@ body[data-theme="dark"] .hljs-variable { color: #e06c75; }
     background: var(--hover) !important;
     color: var(--text) !important;
   }
-  .ce-toolbar__actions { right: 100% !important; left: auto !important; }
+  .ce-toolbar__actions {
+    position: absolute !important;  /* 모바일 모드가 static으로 바꾸면 본문 위로 흐른다 */
+    right: 100% !important;
+    left: auto !important;
+  }
+  .ce-toolbar__plus, .ce-toolbar__settings-btn { position: relative !important; }
   .ce-block__content {
     margin-left: 34px !important;
     margin-right: 10px !important;
