@@ -43,6 +43,13 @@ class SharedWhisper:
         with self._lock:
             if self._model is None:
                 return
+            # 대기 중인 발화는 버린다 — 종료가 인식 백로그에 막혀
+            # 수십 초씩 걸리지 않게 (소리는 녹음 파일에 남아 있다)
+            try:
+                while True:
+                    self._queue.get_nowait()
+            except queue.Empty:
+                pass
             self._queue.put(None)
             if self._thread is not None:
                 self._thread.join(timeout=10)

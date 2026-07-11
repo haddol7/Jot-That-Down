@@ -276,8 +276,14 @@ def main() -> None:
     def stop_runtime() -> None:
         if runtime[0] is None:
             return
+        from PySide6.QtCore import Qt
+
         stopped_sid = runtime[0].session_id
-        runtime[0].stop()
+        QApplication.setOverrideCursor(Qt.WaitCursor)  # 마무리 중 표시
+        try:
+            runtime[0].stop()
+        finally:
+            QApplication.restoreOverrideCursor()
         runtime[0] = None
         window.set_live_stopped()
         # 방금 정지한 세션을 계속 보고 있다면 바로 재생/이어녹음 가능하게
