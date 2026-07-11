@@ -23,6 +23,25 @@ new QWebChannel(qt.webChannelTransport, (channel) => {
   py.jsReady();
 });
 
+// 한글 입력 상태의 Ctrl 단축키: key가 'ㅋ' 같은 한글 자모라서, key 문자로
+// 매칭하는 핸들러(undo 플러그인 Ctrl+Z 등)가 전부 실패한다.
+// 원본은 그대로 두고(물리 keyCode 기반 매칭용) 영문 key를 단 보조 이벤트를
+// 추가로 흘린다. 보조 이벤트에는 keyCode(0)가 없어 이중 실행이 안 된다.
+document.addEventListener("keydown", (event) => {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+  if (event.isComposing || event.__latinized) return;
+  const m = /^Key([A-Z])$/.exec(event.code || "");
+  if (!m) return;
+  const latin = m[1].toLowerCase();
+  if ((event.key || "").toLowerCase() === latin) return;  // 이미 영문
+  const clone = new KeyboardEvent("keydown", {
+    key: latin, code: event.code, bubbles: true, cancelable: true,
+    ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey,
+  });
+  clone.__latinized = true;
+  event.target.dispatchEvent(clone);
+}, true);
+
 // 블록 드래그 시 반투명 스냅샷(고스트)이 커서를 따라다니는 것을 숨긴다 —
 // 위치 피드백은 파란 드롭 선이 담당한다
 const dragGhostBlank = new Image();

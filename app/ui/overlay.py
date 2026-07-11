@@ -77,7 +77,7 @@ class OverlayWindow(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(self._card)
 
-        self._lines: list[tuple[float, QLabel]] = []
+        self._lines: list[tuple[float, QLabel, tuple]] = []  # (시각, 라벨, 발화 키)
         self._drag_offset: QPoint | None = None
 
         # 크기·위치 고정 — 자막 길이에 따라 창이 출렁이지 않는다
@@ -141,16 +141,24 @@ class OverlayWindow(QWidget):
 
     def show_segment(self, segment: TranscriptSegment) -> None:
         text, max_h = self._tail_fit(segment.text)
+        key = (segment.source, segment.t_start_ms)
+        # 이어붙는 문장(같은 발화)은 새 줄 대신 현재 줄을 제자리에서 갱신 —
+        # 안 그러면 문장이 자랄 때마다 이전 버전이 흐린 줄로 남아 겹쳐 보인다
+        if self._lines and self._lines[-1][2] == key:
+            stamp, label, _ = self._lines[-1]
+            label.setText(text)
+            self._lines[-1] = (time.monotonic(), label, key)
+            return
         label = self._make_caption(text, _DOT[segment.source])
         label.setMaximumHeight(max_h)  # 겹침 방지 안전장치
         # 이전 줄은 흐리게 (현재 발화만 또렷)
-        for _, old in self._lines:
+        for _, old, _ in self._lines:
             old.setStyleSheet(
                 "color: rgba(255,255,255,120); line-height: 1.3;"
                 "border-left: 3px solid rgba(255,255,255,60); padding-left: 10px;"
             )
         self._lines_box.addWidget(label)
-        self._lines.append((time.monotonic(), label))
+        self._lines.append((time.monotonic(), label, key))
         while len(self._lines) > self.MAX_LINES:
             self._remove_oldest()
 
@@ -161,7 +169,7 @@ class OverlayWindow(QWidget):
     # --- 내부 ---
 
     def _remove_oldest(self) -> None:
-        _, label = self._lines.pop(0)
+        _, label, _ = self._lines.pop(0)
         self._lines_box.removeWidget(label)
         label.deleteLater()
 

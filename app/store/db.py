@@ -389,6 +389,15 @@ class SessionStore:
         self._conn.commit()
         return cur.lastrowid
 
+    def update_folder(
+        self, folder_id: int, name: str, color: str, emoji: str
+    ) -> None:
+        self._conn.execute(
+            "UPDATE folders SET name = ?, color = ?, emoji = ? WHERE id = ?",
+            (name, color, emoji, folder_id),
+        )
+        self._conn.commit()
+
     def delete_folder(self, folder_id: int) -> None:
         """폴더 삭제 — 안의 세션은 폴더 없음으로 이동."""
         self._conn.execute(

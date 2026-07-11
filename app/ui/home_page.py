@@ -42,21 +42,27 @@ def _friendly_date(iso: str) -> str:
 
 
 class _FolderDialog(FramelessDialog):
-    """새 폴더 만들기 — 이름·색·이모지."""
+    """폴더 만들기/편집 — 이름·색·이모지."""
 
-    def __init__(self, parent=None) -> None:
-        super().__init__("새 폴더", parent)
+    def __init__(
+        self, parent=None,
+        name: str = "", color: str | None = None, emoji: str = "",
+        title: str = "새 폴더",
+    ) -> None:
+        super().__init__(title, parent)
         self.setFixedWidth(360)
         layout = self.body
         form = QFormLayout()
 
-        self._name = QLineEdit()
+        self._name = QLineEdit(name)
         self._name.setPlaceholderText("예: 운영체제")
         form.addRow("이름", self._name)
 
         # 이모지: 클릭하면 아래 그리드가 펼쳐진다
-        self._emoji_value = ""
-        self._emoji_btn = QPushButton("이모지 선택 (선택)")
+        self._emoji_value = emoji
+        self._emoji_btn = QPushButton(
+            f"{emoji}  선택됨" if emoji else "이모지 선택 (선택)"
+        )
         self._emoji_btn.setProperty("cssClass", "pageTab")
         self._emoji_btn.setCursor(Qt.PointingHandCursor)
         self._emoji_btn.clicked.connect(self._toggle_emoji_grid)
@@ -78,19 +84,21 @@ class _FolderDialog(FramelessDialog):
 
         color_row = QHBoxLayout()
         self._color_group = QButtonGroup(self)
-        for i, color in enumerate(FOLDER_COLORS):
+        for i, swatch_color in enumerate(FOLDER_COLORS):
             swatch = QPushButton()
             swatch.setCheckable(True)
             swatch.setFixedSize(26, 26)
             swatch.setCursor(Qt.PointingHandCursor)
             swatch.setStyleSheet(
-                f"background: {color}; border-radius: 13px; border: 2px solid transparent;"
+                f"background: {swatch_color};"
+                " border-radius: 13px; border: 2px solid transparent;"
             )
-            swatch.setProperty("folderColor", color)
+            swatch.setProperty("folderColor", swatch_color)
             self._color_group.addButton(swatch, i)
             color_row.addWidget(swatch)
         color_row.addStretch()
-        self._color_group.button(5).setChecked(True)  # 기본: 파랑
+        start = FOLDER_COLORS.index(color) if color in FOLDER_COLORS else 5  # 기본: 파랑
+        self._color_group.button(start).setChecked(True)
         form.addRow("색", color_row)
 
         layout.addLayout(form)
@@ -349,12 +357,32 @@ class HomePage(QWidget):
     def _folder_menu(self, folder_id: int, global_pos) -> None:
         menu = QMenu(self)
         open_action = menu.addAction("열기")
+        edit_action = menu.addAction("이름·모양 바꾸기…")
         delete_action = menu.addAction("폴더 삭제 (안의 노트는 유지)")
         chosen = menu.exec(global_pos)
         if chosen == open_action:
             self._enter_folder(folder_id)
+        elif chosen == edit_action:
+            self._edit_folder(folder_id)
         elif chosen == delete_action:
             self._store.delete_folder(folder_id)
+            self.refresh()
+
+    def _edit_folder(self, folder_id: int) -> None:
+        row = next(
+            (f for f in self._store.folders() if f[0] == folder_id), None
+        )
+        if row is None:
+            return
+        _, name, color, emoji = row
+        dialog = _FolderDialog(
+            self, name=name, color=color, emoji=emoji, title="폴더 편집"
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+        new_name, new_color, new_emoji = dialog.values()
+        if new_name:
+            self._store.update_folder(folder_id, new_name, new_color, new_emoji)
             self.refresh()
 
     def _session_menu(self, session_id: int, global_pos) -> None:
