@@ -178,8 +178,14 @@ function boot(doc, allowPage, pageId) {
       // (왼쪽에는 타임스탬프 거터가 있어 자리가 항상 있다)
       const editorRoot = document.querySelector(".codex-editor");
       if (editorRoot) {
-        const unNarrow = () =>
-          editorRoot.classList.remove("codex-editor--narrow");
+        const unNarrow = () => {
+          // contains 가드 필수: 없는 클래스를 remove해도 class 속성이
+          // 재설정돼 MutationRecord가 또 생기고, 이 옵저버가 자기 자신을
+          // 무한 호출한다 (타이핑 몇 글자에 렌더러 CPU 100% 영구 정지)
+          if (editorRoot.classList.contains("codex-editor--narrow")) {
+            editorRoot.classList.remove("codex-editor--narrow");
+          }
+        };
         unNarrow();
         new MutationObserver(unNarrow).observe(editorRoot, {
           attributes: true, attributeFilter: ["class"],

@@ -153,7 +153,7 @@ class EditorView(QWebEngineView):
         # ① 페이지 재로드 → ② 렌더러 프로세스 강제 재시작으로 자가 복구한다.
         self._boot_watchdog = QTimer(self)
         self._boot_watchdog.setSingleShot(True)
-        self._boot_watchdog.setInterval(4000)
+        self._boot_watchdog.setInterval(3000)
         self._boot_watchdog.timeout.connect(self._boot_stuck)
         self._boot_seq = 0
         self._stuck_stage = 0
