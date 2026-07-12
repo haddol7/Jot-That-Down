@@ -358,13 +358,6 @@ body[data-theme="dark"] .hljs-variable { color: #e06c75; }
   margin-right: 0;
   padding-right: 0;
 }
-/* 좁은 폭(확대 포함)에서는 본문이 전체 폭을 차지해 ⋮⋮ 놓을 자리가 없다 —
-   왼쪽 여백을 확보해 버튼이 글을 침범하지 않게 한다 */
-.codex-editor--narrow .ce-block__content {
-  margin-left: 34px !important;
-  margin-right: 10px !important;
-  max-width: none !important;
-}
 
 /* 블록 드래그 중 드롭 대상 — 파란 선(플러그인이 border로 그림)에 더해
    블록 전체를 살짝 밝혀 어디로 들어가는지 분명하게 */
@@ -397,11 +390,6 @@ body[data-theme="dark"] .hljs-variable { color: #e06c75; }
     left: auto !important;
   }
   .ce-toolbar__plus, .ce-toolbar__settings-btn { position: relative !important; }
-  .ce-block__content {
-    margin-left: 34px !important;
-    margin-right: 10px !important;
-    max-width: none !important;
-  }
   .ce-inline-tool { width: auto !important; height: auto !important; }
   .ce-inline-tool svg { width: 20px !important; height: 20px !important; }
   .cdx-settings-button { width: 26px !important; height: 26px !important; }

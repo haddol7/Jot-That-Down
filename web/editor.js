@@ -170,49 +170,22 @@ function boot(doc, allowPage) {
       new (window.DragDrop && window.DragDrop.default || window.DragDrop)(
         editor, "3px solid #2383e2"
       );
-      // ⋮⋮가 어떤 상황(확대·좁은 폭·들여쓴 블록)에서도 글을 침범하지 않게
-      // 툴바가 움직일 때마다 본문 열 왼쪽으로 위치를 직접 고정한다
-      const toolbarEl = document.querySelector(".ce-toolbar");
-      if (toolbarEl) {
-        const pin = () => pinToolbarActions(toolbarEl);
-        new MutationObserver(pin).observe(toolbarEl, {
-          attributes: true, attributeFilter: ["style", "class"],
+      // 좁은 폭에서 Editor.js가 ⋮⋮를 본문 오른쪽으로 옮기는 narrow 모드를
+      // 아예 끈다 — 항상 데스크톱 배치(본문 왼쪽 여백)가 유지된다.
+      // (왼쪽에는 타임스탬프 거터가 있어 자리가 항상 있다)
+      const editorRoot = document.querySelector(".codex-editor");
+      if (editorRoot) {
+        const unNarrow = () =>
+          editorRoot.classList.remove("codex-editor--narrow");
+        unNarrow();
+        new MutationObserver(unNarrow).observe(editorRoot, {
+          attributes: true, attributeFilter: ["class"],
         });
-        const actsEl = toolbarEl.querySelector(".ce-toolbar__actions");
-        if (actsEl) {  // 열림/닫힘 시에도 다시 맞춘다
-          new MutationObserver(pin).observe(actsEl, {
-            attributes: true, attributeFilter: ["class"],
-          });
-        }
-        window.addEventListener("resize", pin);
-        document.getElementById("wrap").addEventListener("scroll", pin, true);
       }
       renderGutter();
       editorReady = true;
       setTimeout(pruneStrayImageBlocks, 300);  // 저장돼 있던 빈/깨진 이미지 블록 정리
     },
-  });
-}
-
-// ⋮⋮ 액션 버튼을 본문 열 왼쪽 여백에 고정 — Editor.js의 모드별(모바일·narrow)
-// 배치가 본문 위로 올라오는 경우가 있어 실측 좌표로 직접 배치한다.
-// (style 속성의 !important는 어떤 스타일시트 규칙보다 우선한다)
-function pinToolbarActions(toolbarEl) {
-  // 레이아웃이 확정된 다음 프레임에 계산 — 숨김/전환 중의 0 좌표로
-  // 계산하면 엉뚱한 위치(본문 한가운데)에 박힌다
-  requestAnimationFrame(() => {
-    const acts = toolbarEl.querySelector(".ce-toolbar__actions");
-    const content = document.querySelector(".ce-block__content");
-    if (!acts || !content) return;
-    const tb = toolbarEl.getBoundingClientRect();
-    if (tb.width < 10 && tb.height < 10) return;  // 숨김 상태 — 기준 무효
-    const colLeft = content.getBoundingClientRect().left;
-    if (colLeft <= 0) return;
-    const width = acts.offsetWidth || 26;
-    const left = Math.round(colLeft - tb.left - width - 8);
-    if (!Number.isFinite(left)) return;
-    acts.style.setProperty("left", left + "px", "important");
-    acts.style.setProperty("right", "auto", "important");
   });
 }
 
