@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QFile, QIODevice, QObject, QUrl, Signal, Slot
+from PySide6.QtCore import QFile, QIODevice, QObject, QTimer, QUrl, Signal, Slot
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineScript
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -118,6 +118,33 @@ class EditorView(QWebEngineView):
         self.page().setWebChannel(self._channel)
 
         self.load(QUrl.fromLocalFile(str(_WEB_DIR / "editor.html")))
+
+        # 창을 빠르게 늘렸다 줄이면 크로뮴이 마지막 크기를 놓쳐 본문이
+        # 이전 크기 기준으로 잘려 보인다 (QtWebEngine 리사이즈 유실 버그).
+        # 리사이즈가 잦아든 뒤 줌을 살짝 흔들어 뷰포트를 재동기화한다.
+        self._resize_sync = QTimer(self)
+        self._resize_sync.setSingleShot(True)
+        self._resize_sync.setInterval(200)
+        self._resize_sync.timeout.connect(self._sync_viewport)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._resize_sync.start()
+
+    def _sync_viewport(self) -> None:
+        if not self.isVisible() or self.width() <= 0 or self.height() <= 0:
+            return
+        zoom = self.zoomFactor()
+        kicked = zoom * 1.0001
+        self.setZoomFactor(kicked)
+
+        def restore() -> None:
+            # 그 사이 사용자가 Ctrl+휠로 줌을 바꿨다면 건드리지 않는다
+            if abs(self.zoomFactor() - kicked) < 1e-9:
+                self.setZoomFactor(zoom)
+
+        # 같은 이벤트 루프에서 되돌리면 크로뮴이 변경을 합쳐 무시한다
+        QTimer.singleShot(30, restore)
 
     # --- 파이썬 → JS ---
 
