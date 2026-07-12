@@ -102,9 +102,16 @@ def _qwebchannel_js() -> str:
 
 
 class EditorView(QWebEngineView):
+    # 홈(스택에서 숨김) 상태에서 boot를 실행한 직후 화면에 표시되면
+    # 크로뮴 렌더러가 네이티브 데드락으로 영구 정지한다 (CPU 100%,
+    # "Compositor returned null texture"). 표시가 자리잡은 뒤에만 boot해야
+    # 하므로, 표시 후 잠깐 지난 시점을 shown_settled 시그널로 알린다.
+    shown_settled = Signal()
+
     def __init__(self) -> None:
         super().__init__()
         self.bridge = EditorBridge(self)
+        self.settled = False  # 화면에 표시된 뒤 안정화됐는지 (boot 안전 시점)
 
         # qwebchannel.js를 문서 생성 시점에 주입 (file:// 페이지에서 qrc 접근 불가 대비)
         script = QWebEngineScript()
@@ -146,6 +153,17 @@ class EditorView(QWebEngineView):
         # 홈 ↔ 노트 전환으로 다시 보일 때도 합성 서페이스를 재동기화
         super().showEvent(event)
         self._resize_sync.start()
+        QTimer.singleShot(120, self._mark_settled)
+
+    def hideEvent(self, event) -> None:
+        super().hideEvent(event)
+        self.settled = False
+
+    def _mark_settled(self) -> None:
+        if not self.isVisible() or self.settled:
+            return
+        self.settled = True
+        self.shown_settled.emit()
 
     def _sync_viewport(self) -> None:
         if not self.isVisible() or self.width() <= 0 or self.height() <= 0:

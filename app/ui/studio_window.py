@@ -212,6 +212,7 @@ class SessionPage(QWidget):
         layout.addWidget(splitter)
 
         self.editor.bridge.js_ready.connect(self._on_js_ready)
+        self.editor.shown_settled.connect(self._on_editor_settled)
         self.editor.bridge.block_added.connect(self._on_block_added)
         self.editor.bridge.block_stamp_forced.connect(self._on_block_stamp_forced)
         self.editor.bridge.doc_saved.connect(self._on_doc_saved)
@@ -239,7 +240,9 @@ class SessionPage(QWidget):
             self.pdf_view.open(session_id, pdf_path, clock)
         else:
             self.pdf_view.clear()
-        if self._js_ready:
+        # 에디터가 아직 화면에 없으면(홈에서 전환 중) 표시 후로 미룬다 —
+        # 숨겨진 웹뷰에 boot를 실행하면 크로뮴 렌더러가 데드락된다
+        if self._js_ready and self.editor.settled:
             self._boot_editor()
         else:
             self._pending_open = True
@@ -418,15 +421,26 @@ class SessionPage(QWidget):
     def _on_js_ready(self) -> None:
         self._js_ready = True
         self.apply_theme()
-        if self._pending_open:
+        # 크래시 후 자동 재로드도 여기로 온다 — 세션이 열려 있으면 재부팅 대상
+        if not (self._pending_open or self._session_id is not None):
+            return
+        if self.editor.settled:
             self._pending_open = False
+            self._boot_current()
+        else:
+            self._pending_open = True
+
+    def _on_editor_settled(self) -> None:
+        """에디터가 화면에 표시되어 안정된 시점 — 미뤄둔 boot를 실행한다."""
+        if self._js_ready and self._pending_open:
+            self._pending_open = False
+            self._boot_current()
+
+    def _boot_current(self) -> None:
+        if self._page_id is not None:
+            self._open_page(self._page_id)  # 보던 하위 페이지 유지 (크래시 복구)
+        else:
             self._boot_editor()
-        elif self._session_id is not None:
-            # 렌더 프로세스 크래시 후 자동 재로드 — 보던 페이지를 다시 연다
-            if self._page_id is not None:
-                self._open_page(self._page_id)
-            else:
-                self._boot_editor()
 
     def apply_theme(self) -> None:
         self.editor.set_theme(self._settings.theme, self._settings.editor_font_px)
