@@ -54,8 +54,11 @@ document.addEventListener("dragstart", (e) => {
 // Python이 저장된 문서(또는 null)로 에디터를 기동한다.
 // 세션 전환 시 재호출되므로 기존 인스턴스는 파괴한다.
 // allowPage: 페이지 깊이는 1단계까지만 — 하위 페이지 안에서는 false
-function boot(doc, allowPage) {
+function boot(doc, allowPage, pageId) {
   window._pageAllowed = allowPage !== false;
+  // 저장이 어느 페이지의 것인지 스탬프 — 세션을 빠르게 오갈 때 늦게 도착한
+  // 저장이 현재 페이지에 잘못 기록되는 것을 막는다
+  window._bootPageId = pageId == null ? -1 : pageId;
   if (editor) {
     try { editor.destroy(); } catch (e) { /* 이미 파괴됨 */ }
     editor = null;
@@ -191,21 +194,33 @@ function boot(doc, allowPage) {
 
 // 페이지 전환 직전 등 — 디바운스 없이 즉시 저장
 function saveNow() {
-  if (!editor) return;
+  // 인스턴스 생성 직후에는 save가 아직 없다 (onReady 전) — 로드도 안 된
+  // 문서라 저장할 것도 없으니 건너뛴다
+  if (!editor || typeof editor.save !== "function") return;
   clearTimeout(saveTimer);
-  editor.save().then((data) => py.docSaved(JSON.stringify(data)));
+  const pid = window._bootPageId;  // 저장 완료 시점이 아니라 지금 페이지 기준
+  editor.save().then((data) => py.docSaved(pid, JSON.stringify(data)));
 }
 
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     if (composing) { scheduleSave(); return; }  // 조합이 끝난 뒤로 미룬다
+    if (!editor || typeof editor.save !== "function") return;
+    const pid = window._bootPageId;
     editor.save().then((data) => {
-      py.docSaved(JSON.stringify(data));
+      py.docSaved(pid, JSON.stringify(data));
       renderGutter();
     });
   }, 700);
 }
+
+// 창이 가려지거나 포커스를 잃으면 조합은 끝난 것 — composing이 true로
+// 남으면 scheduleSave가 700ms마다 영원히 재예약된다
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) composing = false;
+});
+window.addEventListener("blur", () => { composing = false; });
 
 document.getElementById("holder").addEventListener(
   "compositionstart", () => { composing = true; }, true

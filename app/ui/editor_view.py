@@ -5,6 +5,7 @@ JS 쪽 진입점은 web/editor.js 참고. 이 모듈 밖에서는 웹 기술의 
 """
 import base64
 import json
+import os
 import re
 from pathlib import Path
 from uuid import uuid4
@@ -29,7 +30,7 @@ class EditorBridge(QObject):
     js_ready = Signal()
     block_added = Signal(str)              # blockId (에디터에서 새 블록 생성)
     block_stamp_forced = Signal(str, int)  # blockId, t_ms (인용 등 원본 시각 지정)
-    doc_saved = Signal(str)                # 문서 전체 JSON
+    doc_saved = Signal(int, str)           # 페이지 id, 문서 전체 JSON
     gutter_clicked = Signal(str)           # blockId
     page_open_requested = Signal(int)      # 페이지 블록 클릭 → 그 페이지로 진입
 
@@ -49,9 +50,9 @@ class EditorBridge(QObject):
     def stampBlock(self, block_id: str, t_ms: int) -> None:
         self.block_stamp_forced.emit(block_id, t_ms)
 
-    @Slot(str)
-    def docSaved(self, doc_json: str) -> None:
-        self.doc_saved.emit(doc_json)
+    @Slot(int, str)
+    def docSaved(self, page_id: int, doc_json: str) -> None:
+        self.doc_saved.emit(page_id, doc_json)
 
     @Slot(str)
     def gutterClicked(self, block_id: str) -> None:
@@ -139,6 +140,24 @@ class EditorView(QWebEngineView):
         self._resize_sync.setInterval(200)
         self._resize_sync.timeout.connect(self._sync_viewport)
 
+        # 표시 안정화 타이머 — 반드시 멤버 하나로: showEvent마다 일회성
+        # 타이머를 만들면 빠른 홈↔노트 왕복 때 이전 표시의 타이머가
+        # 새 표시 직후 발화해 안정화 지연이 사실상 0이 된다 (데드락 재발)
+        self._settle_timer = QTimer(self)
+        self._settle_timer.setSingleShot(True)
+        self._settle_timer.setInterval(300)
+        self._settle_timer.timeout.connect(self._mark_settled)
+
+        # 부팅 워치독 — 크로뮴이 특정 타이밍(숨김 boot, GPU 경합 등)에서
+        # 데드락/무응답에 빠지는 일이 있어, boot 뒤 응답이 없으면
+        # ① 페이지 재로드 → ② 렌더러 프로세스 강제 재시작으로 자가 복구한다.
+        self._boot_watchdog = QTimer(self)
+        self._boot_watchdog.setSingleShot(True)
+        self._boot_watchdog.setInterval(4000)
+        self._boot_watchdog.timeout.connect(self._boot_stuck)
+        self._boot_seq = 0
+        self._stuck_stage = 0
+
     def _on_render_crash(self, status, exit_code) -> None:
         from .. import diag
 
@@ -153,10 +172,11 @@ class EditorView(QWebEngineView):
         # 홈 ↔ 노트 전환으로 다시 보일 때도 합성 서페이스를 재동기화
         super().showEvent(event)
         self._resize_sync.start()
-        QTimer.singleShot(120, self._mark_settled)
+        self._settle_timer.start()
 
     def hideEvent(self, event) -> None:
         super().hideEvent(event)
+        self._settle_timer.stop()
         self.settled = False
 
     def _mark_settled(self) -> None:
@@ -182,10 +202,87 @@ class EditorView(QWebEngineView):
 
     # --- 파이썬 → JS ---
 
-    def boot(self, doc_json: str | None, allow_page: bool = True) -> None:
+    def boot(
+        self, doc_json: str | None, allow_page: bool = True,
+        page_id: int | None = None,
+    ) -> None:
         doc = doc_json if doc_json else "null"
         flag = "true" if allow_page else "false"
-        self.page().runJavaScript(f"boot({doc}, {flag});")
+        pid = "null" if page_id is None else str(int(page_id))
+        self.page().runJavaScript(f"boot({doc}, {flag}, {pid});")
+        # 부팅 액(ack) — 렌더러가 살아 있으면 boot 처리 직후 돌아온다
+        self._boot_seq += 1
+        seq = self._boot_seq
+        self._boot_watchdog.start()
+        self.page().runJavaScript("1", 0, lambda _r, s=seq: self._boot_ack(s))
+
+    def _boot_ack(self, seq: int) -> None:
+        if seq == self._boot_seq:
+            self._boot_watchdog.stop()
+            self._stuck_stage = 0
+
+    def _boot_stuck(self) -> None:
+        from .. import diag
+
+        self._stuck_stage += 1
+        if self._stuck_stage == 1:
+            diag.log("editor", "부팅 무응답 — 페이지 재로드로 복구 시도")
+            self.reload()  # 성공하면 jsReady 재발화 → SessionPage가 재부팅
+            self._boot_watchdog.start()  # 재로드마저 무시되면 다음 단계
+        else:
+            diag.log("editor", "재로드도 무응답 — 렌더러 프로세스 강제 재시작")
+            self._stuck_stage = 0
+            self._kill_renderer()  # renderProcessTerminated → 자동 재로드 경로
+
+    def _kill_renderer(self) -> None:
+        """이 프로세스의 자식 QtWebEngineProcess를 전부 강제 종료한다.
+
+        렌더러 메인 스레드가 네이티브 데드락이면 reload()도 전달되지 않아,
+        프로세스를 죽여 renderProcessTerminated 복구 경로를 태우는 수밖에 없다.
+        (GPU 프로세스가 같이 죽어도 크로뮴이 알아서 다시 띄운다)
+        """
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = ctypes.windll.kernel32
+
+        class _Entry(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_char * 260),
+            ]
+
+        snap = k32.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+        if snap == -1:
+            return
+        me = os.getpid()
+        entry = _Entry()
+        entry.dwSize = ctypes.sizeof(_Entry)
+        killed = 0
+        ok = k32.Process32First(snap, ctypes.byref(entry))
+        while ok:
+            if (
+                entry.th32ParentProcessID == me
+                and entry.szExeFile.lower() == b"qtwebengineprocess.exe"
+            ):
+                handle = k32.OpenProcess(1, False, entry.th32ProcessID)  # TERMINATE
+                if handle:
+                    k32.TerminateProcess(handle, 1)
+                    k32.CloseHandle(handle)
+                    killed += 1
+            ok = k32.Process32Next(snap, ctypes.byref(entry))
+        k32.CloseHandle(snap)
+        from .. import diag
+
+        diag.log("editor", f"QtWebEngineProcess {killed}개 강제 종료")
 
     def set_block_time(self, block_id: str, label: str) -> None:
         self.page().runJavaScript(

@@ -311,7 +311,9 @@ class SessionPage(QWidget):
         # 페이지 깊이는 1단계까지 — 하위 페이지 안에서는 페이지 생성 금지
         row = self._store.get_page(page_id)
         is_root = row is None or row[2] is None
-        self.editor.boot(self._store.load_page_doc(page_id), allow_page=is_root)
+        self.editor.boot(
+            self._store.load_page_doc(page_id), allow_page=is_root, page_id=page_id
+        )
         for block_id, t_ms in self._store.block_times_for_page(
             self._session_id, page_id
         ).items():
@@ -477,8 +479,13 @@ class SessionPage(QWidget):
         )
         self.editor.set_block_time(block_id, format_ms(t_ms))
 
-    def _on_doc_saved(self, doc_json: str) -> None:
-        if self._page_id is not None:
+    def _on_doc_saved(self, page_id: int, doc_json: str) -> None:
+        # JS가 boot 시점의 페이지 id를 스탬프해 보낸다 — 세션을 빠르게 오가면
+        # 이전 페이지의 저장이 늦게 도착할 수 있는데, 현재 페이지가 아니라
+        # '그 내용이 속한' 페이지에 기록해야 한다 (교차 오염 방지)
+        if page_id >= 0:
+            self._store.save_page_doc(page_id, doc_json)
+        elif self._page_id is not None:  # 스탬프 없는 옛 경로 대비
             self._store.save_page_doc(self._page_id, doc_json)
 
     def _on_gutter_clicked(self, block_id: str) -> None:
@@ -600,6 +607,10 @@ class StudioWindow(QMainWindow):
     # --- 페이지 전환 ---
 
     def show_home(self) -> None:
+        # 편집 중 뒤로 나가는 경우 — 디바운스를 기다리지 않고 즉시 저장해
+        # 마지막 타이핑이 유실되거나 저장이 홈에서 늦게 떠다니지 않게 한다
+        if self._stack.currentWidget() is self.session_page:
+            self.session_page.editor.request_save()
         self.went_home.emit()
         self.home.refresh()
         self._stack.setCurrentWidget(self.home)
