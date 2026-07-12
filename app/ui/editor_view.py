@@ -119,6 +119,11 @@ class EditorView(QWebEngineView):
 
         self.load(QUrl.fromLocalFile(str(_WEB_DIR / "editor.html")))
 
+        # 렌더 프로세스가 죽으면 웹뷰가 앱 재시작 전까지 영구 공백이 된다 —
+        # 감지 즉시 다시 로드해 자동 복구한다. 로드가 끝나면 editor.html이
+        # jsReady를 다시 쏘고, SessionPage가 보던 페이지를 재부팅한다.
+        self.page().renderProcessTerminated.connect(self._on_render_crash)
+
         # 창을 빠르게 늘렸다 줄이면 크로뮴이 마지막 크기를 놓쳐 본문이
         # 이전 크기 기준으로 잘려 보인다 (QtWebEngine 리사이즈 유실 버그).
         # 리사이즈가 잦아든 뒤 줌을 살짝 흔들어 뷰포트를 재동기화한다.
@@ -127,8 +132,19 @@ class EditorView(QWebEngineView):
         self._resize_sync.setInterval(200)
         self._resize_sync.timeout.connect(self._sync_viewport)
 
+    def _on_render_crash(self, status, exit_code) -> None:
+        from .. import diag
+
+        diag.log("editor", f"렌더 프로세스 종료 {status} code={exit_code} — 자동 재로드")
+        QTimer.singleShot(0, self.reload)
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        self._resize_sync.start()
+
+    def showEvent(self, event) -> None:
+        # 홈 ↔ 노트 전환으로 다시 보일 때도 합성 서페이스를 재동기화
+        super().showEvent(event)
         self._resize_sync.start()
 
     def _sync_viewport(self) -> None:

@@ -421,6 +421,12 @@ class SessionPage(QWidget):
         if self._pending_open:
             self._pending_open = False
             self._boot_editor()
+        elif self._session_id is not None:
+            # 렌더 프로세스 크래시 후 자동 재로드 — 보던 페이지를 다시 연다
+            if self._page_id is not None:
+                self._open_page(self._page_id)
+            else:
+                self._boot_editor()
 
     def apply_theme(self) -> None:
         self.editor.set_theme(self._settings.theme, self._settings.editor_font_px)
