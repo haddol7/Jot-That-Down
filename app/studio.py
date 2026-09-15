@@ -235,43 +235,36 @@ def main() -> None:
     settings = load_settings(SETTINGS_DIR)
     qt_app.setStyleSheet(build_qss(settings.theme))
 
-    # 데이터 폴더 결정 (설정에서 클라우드 동기화 폴더를 지정했으면 그곳)
-    from app.paths import set_data_root
-
-    if settings.data_dir:
-        custom = Path(settings.data_dir)
-        if custom.is_dir():
-            set_data_root(custom)
-        else:
-            settings.data_dir = ""  # 폴더가 사라졌으면 기본 위치로 복귀
-
-    # 다른 기기에서 같은 데이터 폴더를 쓰고 있는지 (동기화 충돌 방지)
-    import socket
-
     data_root().mkdir(parents=True, exist_ok=True)
-    lock_path = data_root() / ".applock"
-    me = socket.gethostname()
-    try:
-        other = lock_path.read_text(encoding="utf-8").strip()
-    except OSError:
-        other = ""
-    if other and other != me:
-        from PySide6.QtWidgets import QMessageBox
 
-        answer = QMessageBox.warning(
-            None, "다른 기기에서 사용 중",
-            f"데이터 폴더를 '{other}' 기기가 쓰고 있는 것 같습니다.\n"
-            "동시에 열면 데이터가 깨질 수 있습니다. 그래도 열까요?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+    # 동기화 — 데이터는 언제나 로컬에 있고, 드라이브는 그 사본을 두는 곳이다.
+    # 드라이브가 꺼져 있으면 아래 호출들이 조용히 아무 일도 하지 않는다.
+    from app.sync import SyncService, target_for
+    from app.ui.sync_controller import SettingsSyncState, SyncController
+
+    def persist_settings() -> None:
+        save_settings(SETTINGS_DIR, settings)
+
+    sync = SyncController(
+        SyncService(
+            data_root(),
+            target_for(settings.sync_dir),
+            SettingsSyncState(settings, persist_settings),
         )
-        if answer != QMessageBox.Yes:
-            raise SystemExit(0)
-    try:
-        lock_path.write_text(me, encoding="utf-8")
-    except OSError:
-        pass
+    )
+
+    def remember_sync_dir(path: str) -> None:
+        # 드라이브 문자가 바뀌었으면(G: → H:) 새 경로를 기억한다
+        if path and path != settings.sync_dir:
+            settings.sync_dir = path
+            persist_settings()
+
+    sync.target_moved.connect(remember_sync_dir)
+    # DB를 열기 전에 받아온다 — pull은 DB 파일을 통째로 갈아끼운다
+    sync.sync_on_start()
 
     store = SessionStore(data_root() / "jotthatdown.db")
+    sync.attach_store(store)
     store.cleanup_orphan_attachments(data_root() / "attachments")
     bridge = SegmentBridge()
     window = StudioWindow(store, bootstrap.corrections_path(), settings)
@@ -366,6 +359,14 @@ def main() -> None:
     window.source_toggled.connect(on_source_toggled)
     window.resume_requested.connect(on_resume)
 
+    # 동기화: 홈의 버튼은 수동, 세션을 마치거나 홈으로 돌아올 때는 자동으로 올린다
+    window.home.sync_requested.connect(lambda: sync.sync_now(window))
+    window.stop_requested.connect(sync.push_async)
+    window.went_home.connect(sync.push_async)
+    sync.status_changed.connect(window.show_status)
+    # 받아오면 DB가 통째로 바뀌므로, 열려 있던 세션을 놓고 홈부터 다시 그린다
+    sync.reloaded.connect(window.show_home)
+
     # 녹음 상태(경과·소리 감지)를 주기적으로 패널에 밀어준다
     from PySide6.QtCore import QTimer
 
@@ -387,10 +388,7 @@ def main() -> None:
 
     stop_runtime()
     store.close()  # WAL 체크포인트 포함 — 동기화가 DB 파일 하나만 옮기면 되게
-    try:
-        lock_path.unlink(missing_ok=True)
-    except OSError:
-        pass
+    sync.push_on_exit()  # 드라이브가 꺼져 있으면 조용히 넘어간다
     raise SystemExit(exit_code)
 
 

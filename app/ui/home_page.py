@@ -129,6 +129,7 @@ _TYPE, _ID = Qt.UserRole, Qt.UserRole + 1  # 아이템 역할: 종류·id
 class HomePage(QWidget):
     new_session_requested = Signal(str)   # kind: "note" | "pdf"
     session_opened = Signal(int)          # session_id
+    sync_requested = Signal()             # 구글 드라이브와 동기화
 
     def __init__(self, store: SessionStore) -> None:
         super().__init__()
@@ -165,6 +166,19 @@ class HomePage(QWidget):
         self._search.setFixedWidth(200)
         self._search.textChanged.connect(self._refresh_items)
         header.addWidget(self._search)
+
+        # 동기화 — 노트는 늘 이 컴퓨터에 저장된다. 이 버튼은 드라이브와 주고받을 뿐.
+        self._sync_btn = QPushButton()
+        self._sync_btn.setIcon(make_ui_icon("sync", 18))
+        self._sync_btn.setIconSize(QSize(18, 18))
+        self._sync_btn.setProperty("cssClass", "ghost")
+        self._sync_btn.setCursor(Qt.PointingHandCursor)
+        self._sync_btn.setToolTip(
+            "구글 드라이브와 동기화\n"
+            "노트는 항상 이 컴퓨터에 저장됩니다 — 드라이브는 백업·공유용입니다."
+        )
+        self._sync_btn.clicked.connect(self.sync_requested)
+        header.addWidget(self._sync_btn)
 
         note_btn = QPushButton("\U0001F4DD 노트")
         note_btn.setProperty("cssClass", "primary")

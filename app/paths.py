@@ -4,6 +4,7 @@
   (소스: 프로젝트 루트 / exe: 실행 파일 옆)
 - resource_root(): 읽기 전용 번들 자원(web/ 등).
   (소스: 프로젝트 루트 / exe: PyInstaller가 푼 _internal)
+- data_root(): 데이터 원본. 항상 로컬 — 클라우드 폴더로 바뀌지 않는다.
 """
 import sys
 from pathlib import Path
@@ -25,18 +26,14 @@ def resource_root() -> Path:
     return app_root()
 
 
-# 데이터 폴더(DB·녹음·첨부·PDF) — 설정에서 클라우드 동기화 폴더로 바꿀 수 있다.
-# 설정 파일 자체는 항상 기본 위치(app_root()/data)에 남는다.
-_data_root: Path | None = None
-
-
-def set_data_root(path: Path | str) -> None:
-    global _data_root
-    _data_root = Path(path)
-
-
 def data_root() -> Path:
-    return _data_root if _data_root is not None else app_root() / "data"
+    """데이터(DB·녹음·첨부·PDF)는 언제나 여기. 로컬이 원본이다.
+
+    구글 드라이브는 app/sync가 이 폴더를 올리고 받는 '사본'일 뿐이다 —
+    드라이브 폴더를 직접 데이터 위치로 쓰지 않는다. 그랬다가는 드라이브가
+    꺼졌을 때 데이터가 통째로 사라진 것처럼 보인다.
+    """
+    return app_root() / "data"
 
 
 def ensure_std_streams() -> None:

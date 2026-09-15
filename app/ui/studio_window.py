@@ -33,8 +33,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ..audio.exporter import AudioExportError, export_session_audio
+from ..audio.recorder import audio_path
 from ..core.clock import SessionClock, format_ms
 from ..core.models import AudioSource, TranscriptSegment
+from ..paths import data_root
 from ..settings import AppSettings
 from ..store.db import SessionStore
 from ..store.export import export_markdown
@@ -600,6 +603,10 @@ class StudioWindow(QMainWindow):
         self._export_txt_action.triggered.connect(self._on_export_transcript)
         self._toolbar.addAction(self._export_txt_action)
 
+        self._export_audio_action = QAction("음성 내보내기", self)
+        self._export_audio_action.triggered.connect(self._on_export_audio)
+        self._toolbar.addAction(self._export_audio_action)
+
         settings_action = QAction("설정", self)
         settings_action.triggered.connect(self._open_settings)
         self._toolbar.addAction(settings_action)
@@ -617,6 +624,7 @@ class StudioWindow(QMainWindow):
         self._title_action.setVisible(False)
         self._export_action.setVisible(False)
         self._export_txt_action.setVisible(False)
+        self._export_audio_action.setVisible(False)
         self._home_action.setVisible(False)
         self.session_page.panel.set_live_controls(False)
 
@@ -633,6 +641,7 @@ class StudioWindow(QMainWindow):
         self._title_action.setVisible(True)
         self._export_action.setVisible(True)
         self._export_txt_action.setVisible(True)
+        self._export_audio_action.setVisible(True)
         self._home_action.setVisible(True)
         self.session_page.panel.set_live_controls(
             clock is not None, active_sources or set()
@@ -859,3 +868,38 @@ class StudioWindow(QMainWindow):
         with open(path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + "\n")
         QMessageBox.information(self, "내보내기 완료", f"저장됨:\n{path}")
+
+    def _on_export_audio(self) -> None:
+        sid = self.session_page.session_id
+        if sid is None:
+            return
+        if self._recording:
+            QMessageBox.information(
+                self, "음성 내보내기", "녹음을 정지한 뒤 내보내 주세요."
+            )
+            return
+
+        sources = [
+            audio_path(data_root(), sid, source)
+            for source in AudioSource
+            if audio_path(data_root(), sid, source).is_file()
+        ]
+        if not sources:
+            QMessageBox.information(self, "음성 내보내기", "저장된 녹음이 없습니다.")
+            return
+
+        title = self._title_edit.text().strip() or "세션"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "음성 파일 내보내기", f"{title} 녹음.mp3", "MP3 오디오 (*.mp3)"
+        )
+        if not path:
+            return
+        target = Path(path)
+        if not target.suffix:
+            target = target.with_suffix(".mp3")
+        try:
+            export_session_audio(sources, target)
+        except AudioExportError as exc:
+            QMessageBox.warning(self, "음성 내보내기 실패", str(exc))
+            return
+        QMessageBox.information(self, "내보내기 완료", f"저장됨:\n{target}")

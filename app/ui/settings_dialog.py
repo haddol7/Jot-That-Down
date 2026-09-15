@@ -104,22 +104,15 @@ class SettingsDialog(FramelessDialog):
             corrections_btn.clicked.connect(self._open_corrections)
             form.addRow("인식 교정", corrections_btn)
 
-        # 데이터 폴더 — 구글 드라이브/OneDrive 폴더로 지정하면 기기 간 동기화
-        self._data_dir_btn = QPushButton(self._data_dir_label())
-        self._data_dir_btn.setToolTip(
-            "노트·녹음이 저장되는 폴더입니다. 클라우드 동기화 폴더로 옮기면\n"
-            "다른 기기와 자동으로 공유됩니다 (한 번에 한 기기에서만 사용)."
+        # 동기화 — 노트는 항상 이 컴퓨터에 저장된다. 드라이브는 백업·공유용 사본.
+        self._sync_btn = QPushButton(self._sync_label())
+        self._sync_btn.setToolTip(
+            "노트·녹음은 언제나 이 컴퓨터에 저장됩니다.\n"
+            "연결하면 드라이브에 사본을 두어 백업하고 다른 PC와 공유합니다.\n"
+            "드라이브가 꺼져 있어도 앱은 평소대로 동작합니다."
         )
-        self._data_dir_btn.clicked.connect(self._change_data_dir)
-        form.addRow("데이터 폴더", self._data_dir_btn)
-
-        gdrive_btn = QPushButton("구글 드라이브에 연결…")
-        gdrive_btn.setToolTip(
-            "드라이브의 '내 드라이브/JotThatDown' 폴더를 만들어 데이터를 옮깁니다.\n"
-            "구글 드라이브 데스크톱 앱에 로그인돼 있어야 합니다."
-        )
-        gdrive_btn.clicked.connect(self._connect_gdrive)
-        form.addRow("", gdrive_btn)
+        self._sync_btn.clicked.connect(self._toggle_sync)
+        form.addRow("구글 드라이브", self._sync_btn)
 
         storage_btn = QPushButton("용량 관리…")
         storage_btn.clicked.connect(self._open_storage)
@@ -141,31 +134,43 @@ class SettingsDialog(FramelessDialog):
 
         CorrectionsDialog(self._corrections_path, self).exec()
 
-    def _data_dir_label(self) -> str:
-        return self._settings.data_dir or "기본 위치 (변경…)"
+    def _sync_label(self) -> str:
+        if self._settings.sync_dir:
+            return f"연결됨 — {self._settings.sync_dir}  (해제…)"
+        return "구글 드라이브에 연결…"
 
-    def _change_data_dir(self) -> None:
-        from pathlib import Path
+    def _toggle_sync(self) -> None:
+        if self._settings.sync_dir:
+            self._disconnect_sync()
+        else:
+            self._connect_gdrive()
 
-        from PySide6.QtWidgets import QFileDialog, QMessageBox
-
-        from ..paths import data_root
-        from ..store.data_move import migrate_data_dir
-
-        picked = QFileDialog.getExistingDirectory(
-            self, "데이터 폴더 선택 (예: 구글 드라이브 안)", self._settings.data_dir
-        )
-        if picked:
-            self._apply_data_dir(Path(picked))
-
-    def _connect_gdrive(self) -> None:
-        """드라이브 데스크톱을 찾아 '내 드라이브/JotThatDown'으로 연결한다."""
+    def _disconnect_sync(self) -> None:
+        """동기화만 끈다 — 데이터는 이 컴퓨터에 그대로 있다."""
         from PySide6.QtWidgets import QMessageBox
 
-        from ..gdrive import find_google_drive_root
+        answer = QMessageBox.question(
+            self, "동기화 해제",
+            "구글 드라이브 동기화를 끌까요?\n\n"
+            "노트·녹음은 이 컴퓨터에 그대로 남습니다.\n"
+            "드라이브에 올려둔 사본도 지우지 않습니다.",
+        )
+        if answer != QMessageBox.Yes:
+            return
+        self._settings.sync_dir = ""
+        self._settings.sync_revision = 0
+        self._settings.sync_pushed_stamp = 0.0
+        self._sync_btn.setText(self._sync_label())
+        self._on_apply()
 
-        root = find_google_drive_root()
-        if root is None:
+    def _connect_gdrive(self) -> None:
+        """드라이브 데스크톱을 찾아 '내 드라이브/JotThatDown'을 사본 폴더로 삼는다."""
+        from PySide6.QtWidgets import QMessageBox
+
+        from ..sync import google_drive_target
+
+        target = google_drive_target()
+        if target is None:
             answer = QMessageBox.question(
                 self, "구글 드라이브 설치",
                 "구글 드라이브 앱이 아직 없습니다. 바로 설치할까요?\n\n"
@@ -175,18 +180,30 @@ class SettingsDialog(FramelessDialog):
                 "  3. 설치가 끝나면 브라우저에서 구글 계정으로 로그인\n"
                 "  4. 파일 탐색기에 'G:\\내 드라이브'가 생겼는지 확인\n"
                 "  5. 이 버튼을 다시 누르면 연결이 끝납니다\n\n"
-                "노트·녹음이 드라이브에 자동 백업되고 다른 PC와 공유됩니다.",
+                "노트는 이 컴퓨터에 저장되고, 드라이브에는 사본이 올라갑니다.",
             )
             if answer == QMessageBox.Yes:
                 self._install_gdrive()
             return
-        target = root / "JotThatDown"
         try:
-            target.mkdir(exist_ok=True)
+            root = target.root()
         except OSError as error:
             QMessageBox.critical(self, "연결 실패", f"폴더를 만들 수 없습니다:\n{error}")
             return
-        self._apply_data_dir(target)
+
+        self._settings.sync_dir = str(root)
+        # 저쪽에 이미 데이터가 있으면 개정 번호를 0으로 둬서 '받아올 게 있음'으로
+        # 판단하게 한다 — 다음 동기화 때 서비스가 상태를 다시 계산한다.
+        self._settings.sync_revision = 0
+        self._settings.sync_pushed_stamp = 0.0
+        self._sync_btn.setText(self._sync_label())
+        self._on_apply()
+        QMessageBox.information(
+            self, "연결됨",
+            f"드라이브 폴더에 사본을 둡니다:\n{root}\n\n"
+            "노트는 계속 이 컴퓨터에 저장됩니다.\n"
+            "홈 화면의 동기화 버튼으로 언제든 주고받을 수 있습니다.",
+        )
 
     def _install_gdrive(self) -> None:
         """공식 설치 파일을 내려받아 실행한다 — 사용자는 설치·로그인만 하면 된다."""
@@ -217,42 +234,7 @@ class SettingsDialog(FramelessDialog):
             "  1. Windows 권한 창이 뜨면 [예]로 허용\n"
             "  2. 설치 완료 후 구글 계정으로 로그인 (브라우저가 열립니다)\n"
             "  3. 작업 표시줄 트레이의 드라이브 아이콘이 동기화 완료가 되면\n"
-            "  4. '구글 드라이브에 연결…' 버튼을 다시 눌러주세요\n\n"
-            "이미 다른 PC에서 쓰고 있다면 '기존 데이터 발견' 창에서\n"
-            "[예 (그대로 사용)]을 선택하면 됩니다.",
-        )
-
-    def _apply_data_dir(self, new_dir) -> None:
-        from PySide6.QtWidgets import QMessageBox
-
-        from ..paths import data_root
-        from ..store.data_move import migrate_data_dir
-
-        old_dir = data_root()
-        if new_dir == old_dir:
-            return
-        if (new_dir / "jotthatdown.db").exists():
-            # 이미 데이터가 있는 폴더 (다른 기기가 올려둔 것) — 덮어쓰면 안 된다
-            answer = QMessageBox.question(
-                self, "기존 데이터 발견",
-                "선택한 폴더에 이미 JotThatDown 데이터가 있습니다.\n"
-                "그 데이터를 그대로 사용할까요? (이 기기의 데이터는 복사하지 않음)",
-            )
-            if answer != QMessageBox.Yes:
-                return
-        else:
-            try:
-                migrate_data_dir(old_dir, new_dir)
-            except OSError as error:
-                QMessageBox.critical(self, "이동 실패", f"복사 중 오류:\n{error}")
-                return
-        self._settings.data_dir = str(new_dir)
-        self._data_dir_btn.setText(self._data_dir_label())
-        self._on_apply()  # 설정 즉시 저장
-        QMessageBox.information(
-            self, "데이터 폴더 변경",
-            "앱을 다시 시작하면 새 폴더를 사용합니다.\n"
-            f"(기존 폴더는 그대로 남아 있습니다: {old_dir})",
+            "  4. '구글 드라이브에 연결…' 버튼을 다시 눌러주세요",
         )
 
     def _open_storage(self) -> None:

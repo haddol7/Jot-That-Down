@@ -167,6 +167,18 @@ def make_ui_icon(kind: str, size: int = 18, color: str = _INK) -> QIcon:
         body.lineTo(px * 0.73, px * 0.40)
         p.drawPath(body)
         p.drawLine(QPointF(c, px * 0.48), QPointF(c, px * 0.70))
+    elif kind == "sync":
+        # 순환 화살표 — 두 개의 반원 호에 각각 화살촉
+        box = QRectF(px * 0.22, px * 0.22, px * 0.56, px * 0.56)
+        p.drawArc(box, 40 * 16, 160 * 16)   # 위쪽 호
+        p.drawArc(box, 220 * 16, 160 * 16)  # 아래쪽 호
+        head = px * 0.10
+        right = QPointF(px * 0.75, px * 0.40)   # 위 호의 끝(오른쪽)
+        p.drawLine(right, QPointF(right.x() - head, right.y() - head * 0.2))
+        p.drawLine(right, QPointF(right.x() - head * 0.2, right.y() + head))
+        left = QPointF(px * 0.25, px * 0.60)    # 아래 호의 끝(왼쪽)
+        p.drawLine(left, QPointF(left.x() + head, left.y() + head * 0.2))
+        p.drawLine(left, QPointF(left.x() + head * 0.2, left.y() - head))
 
     p.end()
     pixmap.setDevicePixelRatio(scale)

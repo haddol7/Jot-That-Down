@@ -69,14 +69,27 @@ CREATE TABLE IF NOT EXISTS pdf_annotations (
 
 class SessionStore:
     def __init__(self, db_path: Path) -> None:
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(db_path))
+        self._db_path = db_path
+        self._connect()
+
+    def _connect(self) -> None:
+        self._db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(str(self._db_path))
         # 커밋마다 fsync로 메인 스레드가 멈칫하지 않게 (녹음 중 타이핑 지연 방지)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(_SCHEMA)
         self._migrate()
         self._conn.commit()
+
+    @property
+    def db_path(self) -> Path:
+        return self._db_path
+
+    def reopen(self) -> None:
+        """DB 파일이 밖에서 교체된 뒤(동기화 pull) 새 내용으로 다시 연다."""
+        self.close()
+        self._connect()
 
     def _migrate(self) -> None:
         """구버전 DB를 폴더·페이지 구조로 끌어올린다 (멱등)."""
